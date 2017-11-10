@@ -1,0 +1,16 @@
+language: python
+os:
+- linux
+dist: trusty
+python:
+- '3.4'
+- '3.5'
+- '3.6'
+before install:
+- echo "$PATH"
+install:
+- pip install coveralls
+script:
+- python setup.py install
+- nosetests --with-coverage --cover-package=sis ./tests/test_sis_package.py -v
+after_success: coveralls
