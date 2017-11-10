@@ -1,3 +1,9 @@
+## Note: This content was added on Nov. 10 2017 due to issues with the (original site)[http://marte.ic.unicamp.br:8747/].
+
+## Changes to Implementation
+- SIS is now available both as standalone scripts (to be install with pip), or as a python package to include in other projects
+
+
 ------------
 |  AUTHORS  |
 ------------
