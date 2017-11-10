@@ -11,7 +11,7 @@
 - Ulisses Martins Dias <udias@ic.unicamp.br>
 - Joao Carlos Setubal <setubal@iq.usp.br>
 
-Last updated: March 7, 2012
+Last updated: November 10, 2017
 
 This file explains how to run the program SIS in standalone mode.
 
@@ -128,3 +128,12 @@ contigs:   ftp://ftp.ncbi.nih.gov/genomes/Bacteria_DRAFT/Mycobacterium_tuberculo
 In this example we used 'nucmer' and 'delta-filter' to find 219
 conserved blocks and generate the coordinate file. SIS was able to
 find 204 correct adjacencies from those 219 blocks.
+
+------------------------------
+|  HOW TO CITE THIS PROGRAM  |
+------------------------------
+
+If you find SIS useful, please cite the following paper:
+
+Z. Dias, U. Dias, J.C. Setubal. SIS: a program to generate draft genome sequence scaffolds for prokaryotes. 
+BMC Bioinformatics, 13(1):96, 2012
