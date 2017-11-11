@@ -1,7 +1,7 @@
-#!/usr/bin/python2.6
-# -*- coding: iso-8859-1 -*-
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
- #   This software was developed by Zanoni Dias, Ulisses Dias and Jo„o
+ #   This software was developed by Zanoni Dias, Ulisses Dias and Jo√£o
  #   C. Setubal
  #
  #   It should not be redistributed or used for any commercial purpose

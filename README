@@ -1,7 +1,7 @@
 ## Note: This content was added on Nov. 10 2017 due to issues with the (original site)[http://marte.ic.unicamp.br:8747/].
 
 ## Changes to Implementation
-- SIS is now available both as standalone scripts (to be install with pip), or as a python package to include in other projects
+- SIS is now available both as standalone scripts (to be install with pip), or as a python package (`scaffoldsis`, not to be confused with a different package called `sis`) to include in other projects
 
 
 ------------
@@ -135,5 +135,5 @@ find 204 correct adjacencies from those 219 blocks.
 
 If you find SIS useful, please cite the following paper:
 
-Z. Dias, U. Dias, J.C. Setubal. SIS: a program to generate draft genome sequence scaffolds for prokaryotes. 
+Z. Dias, U. Dias, J.C. Setubal. SIS: a program to generate draft genome sequence scaffolds for prokaryotes.
 BMC Bioinformatics, 13(1):96, 2012

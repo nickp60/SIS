@@ -12,7 +12,7 @@ install:
 - pip install coveralls
 script:
 - python setup.py install
-- nosetests --with-coverage --cover-package=sis ./tests/test_sis_package.py -v
+- nosetests --with-coverage --cover-package=scaffoldsis ./tests/test_sis_package.py -v
 after_success: coveralls
 deploy:
   - provider: pypi
@@ -20,3 +20,9 @@ deploy:
     server: https://test.pypi.org/legacy/
     password:
       secure: "qc3DTCMxUfX45gz0d4nTknQFlF1ZsGYekgjqnEIInISW8tJzV+56++eZXsp6jhdoyg6+v2PAuVq5E4aJtKPiIIn539YePWTGNS0kozuwbGXgEGR3vIVMK+++KjZMvXSXFRYSqeJssJaBg2oVBdDmXBxl5FYYe7h/P1aVp5DeVMhRa4mvqlhcQ7Vk50V0IkWzJBC4j9R9nfO9NiwDyQp89wt+wa18OnadCQ9H6z03bb3afQn9od3mOLZfc+oMW3PWvitJnHP13Azofne15CSrPv+eBSBY+QMf0c2K8kSSW752nXHpvC2TB2k0iPiaRHw5Et0ffE0LLN0VWHqHZ900jy1ejfbfPiwoynJT/+R9DJGUvYL12IRF8BsVcZrl2DM8iQPbI0DnC9/gFmkYMYT4NDzFVDeh4emuYe/9ov5P+7a7k/O3XTqhlHNK/i0CH7wCQa1oJVzLDkrvogpinr1QQnnSPD1VMjZoLV00YwbpVss0pVXsGqYOHTOIVqJIRFLRqVcMYpX+gvH7YJEETOYT8TSq04t8+rqdGmW09IESHyI9ZXOviINcFVoPArBCBAwTW1o0aXVqWRMFd3WlQKNqxbM1moP8MCFJwNs1qKaLykpJ2OwzWtbhT96tyfbYNH6eE1k5JNhOSFZwAbUu6qkIVYlizeKKM3Ctz6ITlvjXJjw="
+  - provider: pypi
+    user: NickWaters
+    on:
+      tags: true
+    password:
+      secure: "VNWPc8/Ei0MOnt44BSF0eQxkU6l0gzzFsjDR++rqcrxA2kY/+tsoz/sqKHmzqXTEcQKeLguH6kPNiH4VWUZQUj6nfWhjShWglA3mBT+IK0hewpiZi1PrI7oLYIVqxRd0SZZJKchsL3ah+si2xQdqesqb36OcnJFjHlylpoMcP4F1FDT8KVg2r+J5ttyIpUQt5M8Jk/fliUKboA/jLHSegR1EeTAVZ80i0iFB4kafNZPQEyxIecvnzVw3nZeZFzBY6fxjuokKkVIWdMktl/TT7AjN3wcfWFwuhNFDxaMuy3rSewbrx2BircPSHnVz19oQA5ZrBOzfJb4F6d5gvL5CVtm2wF0JruGyN4eaqVM6uVofchXmPYtfRUwc6//XNN5OYj7Ty43QckqWLQYsuMNSyPI86IWqg3VWWa8JWpWHKgNo96vmwDdLvf889kfNnwa5cTvsduMHFReZeHIMMBsyhTe4GWGlbFVL+MJ8TA9kwq0LZV+diLcZt9QsY3MpuYYusupccuz/ILbfLZlRoDAPzM0JlztadTMaHROSYWbqo4d9Uj6pku1V5BgJNCU5HdFit65sUec7Eo27D7iqeJAxA6e/smv2k/3h1UNzEQfmjH7yPl9/JgULUV8o815x7HdM5zuttVr1YlzoogXWegNoJZSXE7DojLVrjRbsZis/wh4="

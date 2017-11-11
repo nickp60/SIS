@@ -13,8 +13,8 @@ import unittest
 
 logger = logging
 
-from .context import sis
-from sis import sis, multifasta
+from .context import scaffoldsis
+from scaffoldsis import sis, multifasta
 
 @unittest.skipIf((sys.version_info[0] != 3) or (sys.version_info[1] < 5),
                  "Subprocess.call among other things wont run if tried " +
