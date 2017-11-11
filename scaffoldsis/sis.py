@@ -211,10 +211,12 @@ def makeScaffold2(contigs,inContig,c,n):
 #######################################################
 ####################### Main ##########################
 #######################################################
-def main():
+def main(args=None):
+    if args is None:
+        args = sys.argv
     try :
         # Parse the input
-        coords = parse_coords(sys.argv[1])
+        coords = parse_coords(args[1])
 
         # Generate the contig array
         contig_array = coords_to_permutation(coords)
@@ -248,5 +250,5 @@ def main():
             else :
                 print("%s 0" % contig_array[int(el[0]-1)][0])
     except :
-        print("Usage: %s <coord file>" % sys.argv[0])
+        print("Usage: %s <coord file>" % args[0])
         print("   <coord file> is the coordinate file of show-coord (MUMmer)")

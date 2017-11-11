@@ -19,7 +19,7 @@ if sys.version_info <= (3, 0):
 
 setup(
     name='scaffoldsis',
-    version="0.0.2",
+    version="0.0.3",
 
     description='genome scaffolder for prokaryotes',
     long_description="""
@@ -45,8 +45,8 @@ setup(
     },
     entry_points={
        'console_scripts': [
-           'sis.py=sis.SIS:main',
-           'multifasta.py=sis.multifasta:main',
+           'sis.py=scaffoldsis.sis:main',
+           'multifasta.py=scaffoldsis.multifasta:main',
        ],
     },
 )

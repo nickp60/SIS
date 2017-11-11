@@ -111,12 +111,14 @@ def reverse_string(input_sequence) :
 #################### MAIN ##########################
 ################## FUNCTION ########################
 ####################################################
-def main():
+def main(args=None):
+    if args is None:
+        args = sys.argv
     ## Reading SIS file
-    scaffolds = parse_sis(sys.argv[1])
+    scaffolds = parse_sis(args[1])
 
     ## Reading Draft Genome
-    draft       = open(sys.argv[2])
+    draft       = open(args[2])
     draft_array = draft.readlines()
     contig_dict = contig_dictionary(draft_array)
 
