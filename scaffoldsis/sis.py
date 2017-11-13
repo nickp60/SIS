@@ -35,10 +35,6 @@ def parse_coords(coords_filename) :
     info_array  = []
     coords_file = open(coords_filename)
     coords_file.readline()
-    coords_file.readline()
-    coords_file.readline()
-    coords_file.readline()
-    coords_file.readline()
     for line in coords_file :
         match =  re.match("\s+(\S+)\s+(\S+)\s+\|\s+(\S+)\s+(\S+)\s+\|(.*)\s(\S+)", line)
         if match :
@@ -121,7 +117,7 @@ def zeros(n):
 ##################################################################
 # Create the data structure that allows the search for the contig
 # where one element is placed in.
-def makeInContig(contigs,c):
+def makeInContig(contigs,c, n):
 
   inContig = []
   for i in range(n+1):
@@ -215,9 +211,9 @@ def main(args=None):
     if args is None:
         args = sys.argv
     try :
+    # if True:
         # Parse the input
         coords = parse_coords(args[1])
-
         # Generate the contig array
         contig_array = coords_to_permutation(coords)
         contigs = []
@@ -226,10 +222,9 @@ def main(args=None):
 
         c = len(contigs)
         n = len(coords)
-
         # Generate the inContig structure. This structure make it easier
         # to search for the contig where a given element is placed in
-        inContig = makeInContig(contigs,c)
+        inContig = makeInContig(contigs, c, n)
 
         # Generate the scaffold
         scaffold = makeScaffold2(contigs, inContig, c, n)

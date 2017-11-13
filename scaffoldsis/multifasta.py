@@ -141,5 +141,6 @@ def main(args=None):
                     for j in contig_range :
                         scaffold_file.write(draft_array[j])
     except :
-        print("Usage: %s <sis>" % args[0])
-        print("   <sis> is the output file of sis.py)")
+        print("Usage: %s <sis> <multifasta>" % args[0])
+        print("   <sis> is the output file of sis.py")
+        print("   <multifasta> contigs.fasta")
