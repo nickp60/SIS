@@ -115,27 +115,31 @@ def main(args=None):
     if args is None:
         args = sys.argv
     ## Reading SIS file
-    scaffolds = parse_sis(args[1])
+    try:
+        scaffolds = parse_sis(args[1])
 
-    ## Reading Draft Genome
-    draft       = open(args[2])
-    draft_array = draft.readlines()
-    contig_dict = contig_dictionary(draft_array)
+        ## Reading Draft Genome
+        draft       = open(args[2])
+        draft_array = draft.readlines()
+        contig_dict = contig_dictionary(draft_array)
 
-    for scaffold  in scaffolds :
-        scaffold_file = open("%s.fna" % scaffold[0],"w")
+        for scaffold  in scaffolds :
+            scaffold_file = open("%s.fna" % scaffold[0],"w")
 
-        for contig in scaffold[1] :
-            scaffold_file.write(">%s \n" % contig[0])
+            for contig in scaffold[1] :
+                scaffold_file.write(">%s \n" % contig[0])
 
-            contig_range = list(range(contig_dict[contig[0]][1],
-                                      contig_dict[contig[0]][2])
-            )
+                contig_range = list(range(contig_dict[contig[0]][1],
+                                          contig_dict[contig[0]][2])
+                )
 
-            if contig[1] :
-                contig_range.reverse()
-                for j in contig_range :
-                    scaffold_file.write(reverse_string(draft_array[j]))
-            else :
-                for j in contig_range :
-                    scaffold_file.write(draft_array[j])
+                if contig[1] :
+                    contig_range.reverse()
+                    for j in contig_range :
+                        scaffold_file.write(reverse_string(draft_array[j]))
+                else :
+                    for j in contig_range :
+                        scaffold_file.write(draft_array[j])
+    except :
+        print("Usage: %s <sis>" % args[0])
+        print("   <sis> is the output file of sis.py)")
