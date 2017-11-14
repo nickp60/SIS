@@ -40,7 +40,7 @@ def parse_sis(sis_filename) :
                                             int(match.group(2))]
                                             )
                 else :
-                    print("Warning: ignoring line %s:\n %s" % (line_count,
+                    sys.stderr.write("Warning: ignoring line %s:\n %s\n" % (line_count,
                                                                line))
 
     return scaffolds
@@ -66,7 +66,7 @@ def contig_dictionary(genome_array) :
             if not last_contig in contig_dict :
                 contig_dict[last_contig] = [match.group(2), i+1]
             else :
-                print("Two contigs with the same name")
+                sys.stderr.write("Two contigs with the same name\n")
                 sys.exit()
         else :
             last_count = last_count + len(line.rstrip().lstrip())
@@ -101,7 +101,7 @@ def reverse_string(input_sequence) :
         elif el == "Y" :
             new_el = "R"
         else :
-#            print("ERRO: Caracter nao permitido no genoma '%s'" % el)
+#            sys.stderr.write("ERRO: Caracter nao permitido no genoma '%s'" % el)
             new_el = ""
         output_sequence = "%s%s" % (new_el,output_sequence)
     return "%s\n" % output_sequence
@@ -128,6 +128,7 @@ def main(args=None):
 
             for contig in scaffold[1] :
                 scaffold_file.write(">%s \n" % contig[0])
+                sys.stdout.write(">%s \n" % contig[0])
 
                 contig_range = list(range(contig_dict[contig[0]][1],
                                           contig_dict[contig[0]][2])
@@ -137,10 +138,14 @@ def main(args=None):
                     contig_range.reverse()
                     for j in contig_range :
                         scaffold_file.write(reverse_string(draft_array[j]))
+                        sys.stdout.write(reverse_string(draft_array[j]))
                 else :
                     for j in contig_range :
                         scaffold_file.write(draft_array[j])
+                        sys.stdout.write(draft_array[j])
     except :
-        print("Usage: %s <sis> <multifasta>" % args[0])
-        print("   <sis> is the output file of sis.py")
-        print("   <multifasta> contigs.fasta")
+        sys.stderr.write("Usage: %s <sis> <contigs>\n" % args[0])
+        sys.stderr.write("   <sis> is the output file of sis.py\n")
+        sys.stderr.write("   <contigs> contigs.fasta\n")
+        sys.stderr.write("  writes messages to stderr and scaffolds to stdout\n")
+        sys.exit(1)

@@ -34,10 +34,9 @@ def min_first_second_element(array) :
 def parse_coords(coords_filename) :
     info_array  = []
     coords_file = open(coords_filename)
-    coords_file.readline()
     for line in coords_file :
         match =  re.match("\s+(\S+)\s+(\S+)\s+\|\s+(\S+)\s+(\S+)\s+\|(.*)\s(\S+)", line)
-        if match :
+        if match and match.group(1) != "[S1]" : #ignore header line
             s1     = int(match.group(1))
             e1     = int(match.group(2))
             s2     = int(match.group(3))
@@ -244,6 +243,8 @@ def main(args=None):
                 print("%s 1" % contig_array[int(abs(el[0])-1)][0])
             else :
                 print("%s 0" % contig_array[int(el[0]-1)][0])
-    except :
+    except Exception as e:
+        print(e)
         print("Usage: %s <coord file>" % args[0])
         print("   <coord file> is the coordinate file of show-coord (MUMmer)")
+        sys.exit(1)

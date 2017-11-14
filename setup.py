@@ -19,7 +19,7 @@ if sys.version_info <= (3, 0):
 
 setup(
     name='scaffoldsis',
-    version="0.0.5",
+    version="0.1.0",
 
     description='genome scaffolder for prokaryotes',
     long_description="""

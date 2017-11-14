@@ -2,7 +2,8 @@
 
 ## Changes to Implementation
 - SIS is now available both as standalone scripts (to be install with pip), or as a python package (`scaffoldsis`, not to be confused with a different package called `sis`) to include in other projects
-
+- sis.py and multifasta.py return a return code 1 if there is an error in execution
+- as of 0.1.0, multifasta.py writes scaffolds to stdout as well as to the local directory
 
 ------------
 |  AUTHORS  |
