@@ -28,6 +28,7 @@ setup(
     by Zanoni Dias, Ulisses Dias and João C Setubal
     """,
     url='https://github.com/nickp60/SIS',
+    install_required=['biopython'],
     author='Nick Waters',
     author_email='nickp60@gmail.com',
     license='MIT',
