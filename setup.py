@@ -48,7 +48,7 @@ setup(
        'console_scripts': [
            'sis.py=scaffoldsis.sis:main',
            'multifasta.py=scaffoldsis.multifasta:main',
-           'scaffold.py=scaffoldsis.scaffsis:main',
+           'scaffold.py=scaffoldsis.scaffold:main',
        ],
     },
 )
