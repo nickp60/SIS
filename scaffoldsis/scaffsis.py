@@ -10,13 +10,13 @@ import io
 from contextlib import redirect_stdout
 
 
-from sis import main as sis_main
+from .sis import main as sis_main
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
-def print(x):
-    sys.stderr.write(str(x) + "\n")
-
+# For debugging use only:
+# def print(x):
+#     sys.stderr.write(str(x) + "\n")
 
 def get_minimal_logger(verbosity):
     """
@@ -36,43 +36,51 @@ def get_minimal_logger(verbosity):
     logger.debug("logging at level {0}".format(verbosity))
     return logger
 
-    
+
 def get_args():
     parser = argparse.ArgumentParser(
-        description="Use nucmer to generate coords file from a reference and"+
-        "some contigs, and then scaffolds the contigs against " +
-        "a reference; fill with N's")
+        description="Use nucmer's coords and SIS to generate to scaffold"+
+        "some contigs against a reference, filling the baps with N's")
     parser.add_argument( "reference", action="store", type=str,
                          help="reference strain")
     parser.add_argument("contigs", action="store",
                         help="path to your contigs")
-    parser.add_argument("-f", "--fill", action="store_true", dest="fill",
-                        default=False,
-                        help="output as single file; default: %(default)s")
     parser.add_argument("-b", "--blend", action="store", dest="blend",
                         default=1000,
-                        help="output as single file; default: %(default)s")
+                        help="if two hits from the same contigs are " +
+                        "separated by a gap smaller than this, the hits " +
+                        "will be merged; default: %(default)s")
     parser.add_argument("-m", "--minimum", action="store", dest="minimum",
                         default=2000,
-                        help="minimum length nucmer hit to consider; default: %(default)s")
-    parser.add_argument("-s", "--similarity", action="store", dest="similarity",
+                        help="minimum length nucmer hit to consider; " +
+                        "default: %(default)s")
+    parser.add_argument("-s", "--similarity", action="store",
+                        dest="similarity",
                         default=50,
-                        help="when a contig has two neighborring hits, it the hits are within this distance, we combine the hits; default: %(default)s")
-    parser.add_argument("-u", "--unplaced", action="store_true", dest="unplaced",
-                        help="output unplaced contigs to stdout instead of the scaffolds")
+                        help="when a contig has two hits that share " +
+                        "similare start or end coordinates, the shorter hit" +
+                        "will be filtered out to keep the longer hit; " +
+                        "default: %(default)s")
+    parser.add_argument("-u", "--unplaced", action="store_true",
+                        dest="unplaced",
+                        help="output unplaced contigs to stdout instead of " +
+                        "the scaffolds")
     parser.add_argument("-t", "--thresh", action="store", dest="threshold",
-                        help="Percent identity for matches to be scaffolded: %(default)s,",
+                        help="Ignore nucmer hits with less percent identity " +
+                        "than this; %(default)s,",
                         default=95)
     parser.add_argument("-v", "--verbosity", action="store", dest="verbosity",
-                        help="logging verbosity output to stderr", choices=[1,2,3,4,5],
+                        help="logging verbosity output to stderr",
+                        choices=[1,2,3,4,5],
                         type=int,
                         default=2)
     args = parser.parse_args()
     return(args)
 
 
-
 def check_exes():
+    """Ensure that needed system executables are present
+    """
     program_dict = {"nucmer":None,
                     "show-coords":None,
                     "delta-filter":None}
@@ -86,12 +94,11 @@ def check_exes():
     return program_dict
 
 
-
 def log_coords(msg, coords, logger):
     """ takes some of the pain out of logging nested lists
     """
     logger.debug("%s:\n %s",
-                 msg, 
+                 msg,
                  "\n".join(
                      [y  for y in \
                       ["\t".join(
@@ -99,8 +106,10 @@ def log_coords(msg, coords, logger):
                  )
     )
 
+
 def make_nucmer_delta_show_cmds(exes, ref, query, out_dir, prefix="out", header=True):
-    """results list of cmds
+    """construct MUMmer commands needed by SIS
+    returns: results list of cmds
     """
     # nucmer
     nucmer_cmd = "{0} {1} {2} -p {3}/{4} > {3}/nucmer.log 2>&1".format(
@@ -117,11 +126,14 @@ def make_nucmer_delta_show_cmds(exes, ref, query, out_dir, prefix="out", header=
     return [nucmer_cmd, delta_filter_cmd, show_coords_cmd]
 
 
-# Parse the coordinate file generated by nucmer or promer
-def parse_coords(coords_filename, min_length, thresh) :
+def parse_coords(coords_filename, min_length, thresh):
+    """Parse the coordinate file generated by nucmer or promer
+    NOTE:  We rely on SIS to call whether things should be on dofferent
+    chromasomes;  thats why we dont return them
+    """
     info_array  = []
     coords_file = open(coords_filename)
-    for line in coords_file :
+    for line in coords_file:
         match =  re.match("\s+(\d+)\s+(\d+)\s+\|\s+(\d+)\s+(\d+)\s+\|\s+(\d+)\s+(\S+)\s+\|\s+(\S+)\s+\|(.*)\s(\S+)", line)
         #                     s1        e1           s2      e2           len1   en 2         percent
         if match and match.group(1) != "[S1]" : #ignore header line
@@ -140,7 +152,11 @@ def parse_coords(coords_filename, min_length, thresh) :
     info_array.sort()
     return info_array
 
-def parse_sis(sis_file) :
+
+def parse_sis(sis_file):
+    """ parse SIS output
+    returns a dict {scaff_A: [contig_1, contig2, ...]}
+    """
     scaffolds     = {}
     line_count    = 0
     this_scaff    = None
@@ -151,20 +167,21 @@ def parse_sis(sis_file) :
             if match :
                 this_scaff = match.group(1).rstrip().lstrip()
                 scaffolds[this_scaff] = []
-
             else :
                 match = re.match("^(.*) ([01])$", line)
                 if match :
                     scaffolds[this_scaff].append(
                         [match.group(1),int(match.group(2))])
                 else :
-                    sys.stderr.write("Warning: ignoring line %s:\n %s\n" % (line_count,
-                                                               line))
-
+                    sys.stderr.write("Warning: ignoring line %s:\n %s\n" %
+                                     (line_count, line))
     return scaffolds
 
 
 def blend_close_hits(coords, blend, logger):
+    """ remove gaps potentially introduced by indels between ref and contigs
+    returns a coord list
+    """
     new_coords = []
     prev_line = None
     logger.info("Blending overlapping or close hits")
@@ -183,23 +200,27 @@ def blend_close_hits(coords, blend, logger):
                  new_coords.append(prev_line)
             # check if the coords are close enoguh to merge
             elif abs(line[2] - prev_line[3]) < blend:
-                logger.debug("Blending close neighboring hits: %s %s"% (prev_line, line)) 
+                logger.debug("Blending close neighboring hits: %s %s"%
+                             (prev_line, line))
                 prev_line[1] = line[1]  # change subject end
                 prev_line[3] = line[3]  # change query/contig end
-                line = prev_line # we re-process this line, essentially
+                line = prev_line #  by not appending, we re-process this line
                 logger.debug("into: %s" % prev_line)
- #               new_coords.append(prev_line)
-            # detect overlapping hits:  same contig, but the end of the previous hit is ahead of the start of this hit
+            # detect overlapping hits:  same contig, but the end of the
+            #   previous hit is ahead of the start of this hit
             elif prev_line[1] > line[0]:
-                logger.debug("Blending overlapping hits: %s %s"% (prev_line, line)) 
+                logger.debug("Blending overlapping hits: %s %s"% (prev_line, line))
                 prev_line[1] = line[1]  # change subject end
                 prev_line[3] = line[3]  # change query/contig end
-                line = prev_line # we re-process this line, essentially
+                line = prev_line  # by not appending, we re-process this line
                 logger.debug("into: %s" % prev_line)
             else:
                 new_coords.append(prev_line)
             prev_line = line
-    log_coords(logger=logger, msg="blended coords", coords=new_coords)
+    # include the last line
+    new_coords.append(prev_line)
+    # log results
+    log_coords(logger=logger, msg="Blended Coords", coords=new_coords)
     return new_coords
 
 
@@ -218,35 +239,37 @@ def filter_list(lst, pos1, pos2, sim, depth=0, logger=None):
     log_coords(logger=logger, msg="Old Coord List", coords=new_coords)
     for i1, i2 in itertools.combinations(
             list(range(0, len(lst))), 2):
-        # if the differences between starts pass our threshold, ie similar start coordinates
-        #@ if abs(1 - 40) < 50: (yes)
+        # if the differences between starts pass our threshold...
+        #@ if abs(1 - 40) < 50: (yes) (ie similar start coordinates)
         start , end = pos1, pos2
-        # check the starts for similar hits
+        # check the starts for similar hits...
         logger.debug("(%d - %d)  < %d ?", lst[i1][pos1], lst[i2][pos1], sim)
         if abs(lst[i1][pos1] - lst[i2][pos1]) < sim:
             logger.debug("Yes, removing one of the hits")
-            # pick longest; start with the first, and replace if a longer one is found
+            # pick the longer of the pair, removing the shorter in the new list
             #@ if abs(300-1) > abs(289 - 40) : (yes)
             if abs(lst[i1][pos2] - lst[i1][pos1]) > abs(lst[i2][pos2] - lst[i2][pos1]):
-                new_lst = [x for x in lst if x != lst[i2]]  # new list, removing the one we filtered out
+                new_lst = [x for x in lst if x != lst[i2]]
             else:
-                new_lst = [x for x in lst if x != lst[i1]]  # new list, removing the one we filtered out
+                new_lst = [x for x in lst if x != lst[i1]]
             logger.debug("Removed a hit with a similar start coord")
-            return filter_list(new_lst, pos1, pos2, sim, depth=depth + 1, logger=logger) # recurse
+            return filter_list(new_lst, pos1, pos2, sim,
+                               depth=depth + 1, logger=logger) # recurse
         else:
             logger.debug("No")
-        # check the ends for similar hits
+        # check the ends for similar hits...
         logger.debug("(%d - %d)  < %d ?", lst[i1][pos2], lst[i2][pos2], sim)
         if abs(lst[i1][pos2] - lst[i2][pos2]) < sim:
             logger.debug("Yes, removing one of the hits")
             # pick the longer:
             #@ if abs(300-1) > abs(289 - 40) : (yes)
             if abs(lst[i1][pos2] - lst[i1][pos1]) > abs(lst[i2][pos2] - lst[i2][pos1]):
-                new_lst = [x for x in lst if x != lst[i2]]  # new list, removing the one we filtered out
+                new_lst = [x for x in lst if x != lst[i2]]
             else:
-                new_lst = [x for x in lst if x != lst[i1]]  # new list, removing the one we filtered out
+                new_lst = [x for x in lst if x != lst[i1]]
             logger.debug("Removed a hit with a similar end coord")
-            return filter_list(new_lst, pos1, pos2, sim, depth=depth + 1, logger=logger) # recurse
+            return filter_list(new_lst, pos1, pos2, sim,
+                               depth=depth + 1, logger=logger) # recurse
         else:
             logger.debug("No")
     if len(lst) > 1:
@@ -267,28 +290,27 @@ def condensce_coords(coords, sim=50, blend=0, logger=None):
     it is common to have multiple hits for each contig, indicating indels.
     Here, we filter out the internal hits, only keeping the ones neccessary
     to calculate the gaps between contigs
-    First, if two hits are separated by the --blend ammount, combine into a single hit
+    First, if two hits are separated by the --blend, combine into a single hit
     Then, similar hits exist (within -/+ sim), take the longer one.
     Then, remove any internal hits
 
     OLD:
-    [S1]     [E1]  |     [S2]     [E2]  |  [LEN 1]  [LEN 2]  |  [% IDY]  | [TAGS]
-=====================================================================================
-       3    65371  |    65375        1  |    65369    65375  |    99.91  | c_g NODE_1
-   70474    80282  |        1     9809  |     9809     9809  |   100.00  | c_g NODE_3
-   80326    85557  |     9888    15119  |     5232     5232  |    99.90  | c_g NODE_2
-   80326    85557  |     1088    15119  |     5232     5232  |    99.90  | c_g NODE_2 # this line added to filer
-   85444   100560  |        1    15117  |    15117    15117  |    99.99  | c_g NODE_2
-  100675   105547  |    15638    20510  |     4873     4873  |   100.00  | c_g NODE_2
-  100558   100751  |        1      194  |      194      194  |   100.00  | c_g NODE_4
+    [S1]     [E1]  |   [S2]     [E2]  | [LEN 1]  [LEN 2]  | [% IDY]  | [TAGS]
+==============================================================================
+       3    65371  |  65375        1  |  65369    65375  |  99.91  | c_g NODE_1
+   70474    80282  |      1     9809  |   9809     9809  | 100.00  | c_g NODE_3
+   80326    85557  |   9888    15119  |   5232     5232  |  99.90  | c_g NODE_2
+   85444   100560  |      1    15117  |  15117    15117  |  99.99  | c_g NODE_2
+  100675   105547  |  15638    20510  |   4873     4873  | 100.00  | c_g NODE_2
+  100558   100751  |      1      194  |    194      194  | 100.00  | c_g NODE_4
 
     NEW:
-    [S1]     [E1]  |     [S2]     [E2]  |  [LEN 1]  [LEN 2]  |  [% IDY]  | [TAGS]
-=====================================================================================
-       3    65371  |    65375        1  |    65369    65375  |    99.91  | c_g NODE_1
-   70474    80282  |        1     9809  |     9809     9809  |   100.00  | c_g NODE_3
-   80326    105547 |     9888    15119  |     5232     5232  |    99.90  | c_g NODE_2
-  100558   100751  |        1      194  |      194      194  |   100.00  | c_g NODE_4
+    [S1]     [E1]  |   [S2]     [E2]  | [LEN 1]  [LEN 2]  | [% IDY]  | [TAGS]
+===============================================================================
+       3    65371  |  65375        1  |  65369    65375  |  99.91  | c_g NODE_1
+   70474    80282  |      1     9809  |   9809     9809  | 100.00  | c_g NODE_3
+   80326    105547 |   9888    15119  |   5232     5232  |  99.90  | c_g NODE_2
+  100558   100751  |      1      194  |    194      194  | 100.00  | c_g NODE_4
 
     NOTE:  we assume ordering at this stage, where coordinates of the
            reference in the first column [S1] are ascending
@@ -307,18 +329,20 @@ def condensce_coords(coords, sim=50, blend=0, logger=None):
             contig_coords_list = filter_list(contig_coords_list, 2,3, sim)
         filtered_coords.extend(contig_coords_list)
     # condensce
-    log_coords(logger=logger, msg="Filtered Coord List", coords=new_coords)
+    log_coords(logger=logger, msg="Filtered Coord List",
+               coords=filtered_coords)
     for idx, line in enumerate(filtered_coords):
         if line[4] not in processed_contigs:
             new_coords.append(line)
             processed_contigs.append(line[4])
         else: # if contig already found, warn and ignore
-            logger.warning("Warning: %s found twice in the filtered coordinate list, " +
-                           "likely indicating major rearrangements. Check a visualization " +
-                           "of the contigs against your reference. only outputting first hit", line[4])
+            logger.warning(str(
+                "Warning: %s found twice in the filtered coordinate list, " +
+                "likely indicating major rearrangements. Check a visualization " +
+                "of the contigs against your reference. only outputting first hit"), line[4])
     new_coords.sort()
     log_coords(logger=logger, msg="SORTED coords", coords=new_coords)
-    
+
     return new_coords
 
 
@@ -340,7 +364,7 @@ def write_scaffold(coords, contig_file, thresh, sis_scaff, logger):
         for contig_ori_pair in contigs:
             scaffolded_sequences.append(contig_ori_pair[0])
         for idx, line in enumerate(coords):
-            # skip entries not found in this scaffold 
+            # skip entries not found in this scaffold
             if line[4] not in scaffolded_sequences:
                 logger.debug("Not writing out %s in scaffold %d" % line[4], scaff_number)
                 continue
@@ -360,11 +384,15 @@ def write_scaffold(coords, contig_file, thresh, sis_scaff, logger):
                         if idx != len(coords) - 1:
                             #                 next start - this end
                             gap_len = coords[idx + 1][0] - line[1]
+                            # we ignore negative gaps, which would indicate
+                            # a contig insertion
+                            if gap_len < 0:
+                                gap_len = 0
                             logger.debug("adding gap of %d" % gap_len)
                             new_seq = new_seq + ("N" * gap_len)
                             Ns = Ns + gap_len
                 if not FOUND:
-                    logger.error(                            
+                    logger.error(
                         str("Contig %s found in coords file but " +
                             "not in contigs file seq ids: \n%s! Exiting...\n") %\
                         (line[4], "\n".join(rec_ids)))
@@ -376,10 +404,11 @@ def write_scaffold(coords, contig_file, thresh, sis_scaff, logger):
         scaff_number = scaff_number +  1
     return (results)
 
+
 def write_unplaced(coords, contig_file, thresh, sis_scaff, logger):
-    """ for each contig, check if it is part of the scaffold.  if not, write it
+    """ for each contig, check if it is part of a scaffold.  if not, write it
     This check to see if the contig is either (a) in the filtered coords file or
-    (b) in the scaffolded sequences file.  this gets rid of sequences 
+    (b) in the scaffolded sequences file.  this gets rid of sequences
     not scaffolded by sis, or filtered out here due to lenght
     """
     unscaffolded_count = 0
@@ -397,8 +426,9 @@ def write_unplaced(coords, contig_file, thresh, sis_scaff, logger):
     return unscaffolded_count
 
 
-def main():
-    args = get_args()
+def main(args=None):
+    if args is None:
+        args = get_args()
     exe_dict = check_exes()
     logger = get_minimal_logger(args.verbosity)
     cmds = make_nucmer_delta_show_cmds(
@@ -412,7 +442,6 @@ def main():
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE,
                        check=True)
-    # stdout_ = sys.stdout #Keep track of the previous value.
     f = io.StringIO()
     logger.info("Generating scaffold with  SIS")
     with redirect_stdout(f):
@@ -427,23 +456,21 @@ def main():
     new_coords = condensce_coords(coords, sim=args.similarity, blend=args.blend, logger=logger)
     log_coords(logger=logger, msg="Condensced coords", coords=new_coords)
     scaffolds = parse_sis(sis_file=sis_out)
-    print(scaffolds)
     if args.unplaced:
-        unscaffolded_count = write_unplaced(new_coords, args.contigs, thresh=args.threshold, sis_scaff=scaffolds, logger=logger)
-        logger.info("Finished! Wrote out %d scaffolds", unscaffolded_count) 
+        unscaffolded_count = write_unplaced(
+            new_coords, args.contigs,
+            thresh=args.threshold, sis_scaff=scaffolds, logger=logger)
+        logger.info("Finished! Wrote out %d unscaffolded contigs", unscaffolded_count)
     else:
-        results = write_scaffold(new_coords, args.contigs, thresh=args.threshold, sis_scaff=scaffolds, logger=logger)
-        logger.info("Finished! Wrote out %d scaffolds", len(results))
+        results = write_scaffold(
+            new_coords, args.contigs, thresh=args.threshold,
+            sis_scaff=scaffolds, logger=logger)
+        logger.info("Finished! Wrote out %d scaffold(s)", len(results['Scaffold name']))
         sys.stderr.write("Name\tLength\tN's\n")
         for i in range(len(results['Scaffold name'])):
-            print(i)
             sys.stderr.write("\t".join([
                 results['Scaffold name'][i],
                 str(results['Length'][i]),
                 str(results["N's"][i])
                 ]) + "\n")
-                    
-
-
-if __name__ == "__main__":
-    main()
+    return 0

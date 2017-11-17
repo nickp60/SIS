@@ -13,7 +13,9 @@ install:
 script:
 - python setup.py install
 - nosetests --with-coverage --cover-package=scaffoldsis ./tests/test_sis_package.py -v
-after_success: coveralls
+after_success:
+- coveralls
+- scaffold.py -h
 deploy:
   - provider: pypi
     user: NickWaters

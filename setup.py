@@ -41,12 +41,13 @@ setup(
     keywords='bioinformatics',
     packages=find_packages(),
     package_data={
-       '': [path.join(__name__, "sis", "examples/*")],
+       '': [path.join(__name__, "examples/*")],
     },
     entry_points={
        'console_scripts': [
            'sis.py=scaffoldsis.sis:main',
            'multifasta.py=scaffoldsis.multifasta:main',
+           'scaffold.py=scaffoldsis.scaffsis:main',
        ],
     },
 )
