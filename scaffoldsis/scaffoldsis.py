@@ -5,16 +5,37 @@ import sys
 import shutil
 import subprocess
 import itertools
-
+import logging
 import io
 from contextlib import redirect_stdout
 
+
 from sis import main as sis_main
-from Bio import SeqIO # , SearchIO
+from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
 def print(x):
     sys.stderr.write(str(x) + "\n")
+
+
+def get_minimal_logger(verbosity):
+    """
+    """
+    logger = logging.getLogger(__name__)
+    if (verbosity * 10) not in range(10, 60, 10):
+        raise ValueError('Invalid log level: %s' % verbosity)
+    # logging.basicConfig(level=logging.DEBUG)
+    logger.setLevel(logging.DEBUG)
+    # create console handler and set level to given verbosity
+    console_err = logging.StreamHandler(sys.stderr)
+    console_err.setLevel(level=(verbosity * 10))
+    console_err_format = logging.Formatter("%(levelname)7s - %(message)s")
+    console_err.setFormatter(console_err_format)
+    logger.addHandler(console_err)
+    logger.debug("Initializing logger")
+    logger.debug("logging at level {0}".format(verbosity))
+    return logger
+
     
 def get_args():
     parser = argparse.ArgumentParser(
@@ -34,11 +55,22 @@ def get_args():
     parser.add_argument("-m", "--minimum", action="store", dest="minimum",
                         default=2000,
                         help="minimum length nucmer hit to consider; default: %(default)s")
+    parser.add_argument("-s", "--similarity", action="store", dest="similarity",
+                        default=50,
+                        help="when a contig has two neighborring hits, it the hits are within this distance, we combine the hits; default: %(default)s")
+    parser.add_argument("-u", "--unplaced", action="store_true", dest="unplaced",
+                        help="output unplaced contigs to stdout instead of the scaffolds")
     parser.add_argument("-t", "--thresh", action="store", dest="threshold",
                         help="Percent identity for matches to be scaffolded: %(default)s,",
                         default=95)
+    parser.add_argument("-v", "--verbosity", action="store", dest="verbosity",
+                        help="logging verbosity output to stderr", choices=[1,2,3,4,5],
+                        type=int,
+                        default=2)
     args = parser.parse_args()
     return(args)
+
+
 
 def check_exes():
     program_dict = {"nucmer":None,
@@ -54,6 +86,18 @@ def check_exes():
     return program_dict
 
 
+
+def log_coords(msg, coords, logger):
+    """ takes some of the pain out of logging nested lists
+    """
+    logger.debug("%s:\n %s",
+                 msg, 
+                 "\n".join(
+                     [y  for y in \
+                      ["\t".join(
+                          [str(x) for x in sublist]) for sublist in coords]]
+                 )
+    )
 
 def make_nucmer_delta_show_cmds(exes, ref, query, out_dir, prefix="out", header=True):
     """results list of cmds
@@ -120,9 +164,10 @@ def parse_sis(sis_file) :
     return scaffolds
 
 
-def blend_close_hits(coords, blend):
+def blend_close_hits(coords, blend, logger):
     new_coords = []
     prev_line = None
+    logger.info("Blending overlapping or close hits")
     for line in coords:
         if prev_line is None:
             prev_line = line   # first time through
@@ -136,89 +181,86 @@ def blend_close_hits(coords, blend):
             elif (prev_line[3] > prev_line[2] and line[3] < line[2] ) or \
                  (prev_line[2] > prev_line[3] and line[2] < line[3] ):
                  new_coords.append(prev_line)
-            # check if the coords are close enoguh to merge: normal direction
+            # check if the coords are close enoguh to merge
             elif abs(line[2] - prev_line[3]) < blend:
-                print("Blending lines: %s %s"% (prev_line, line)) 
+                logger.debug("Blending close neighboring hits: %s %s"% (prev_line, line)) 
                 prev_line[1] = line[1]  # change subject end
                 prev_line[3] = line[3]  # change query/contig end
                 line = prev_line # we re-process this line, essentially
-                print("into: %s" % prev_line)
+                logger.debug("into: %s" % prev_line)
  #               new_coords.append(prev_line)
+            # detect overlapping hits:  same contig, but the end of the previous hit is ahead of the start of this hit
+            elif prev_line[1] > line[0]:
+                logger.debug("Blending overlapping hits: %s %s"% (prev_line, line)) 
+                prev_line[1] = line[1]  # change subject end
+                prev_line[3] = line[3]  # change query/contig end
+                line = prev_line # we re-process this line, essentially
+                logger.debug("into: %s" % prev_line)
             else:
                 new_coords.append(prev_line)
             prev_line = line
-    print ("Postblending")
-    for line in new_coords:
-        print(line)
+    log_coords(logger=logger, msg="blended coords", coords=new_coords)
     return new_coords
 
 
-def filter_list(lst, pos1, pos2, sim, depth="fitst"):
+def filter_list(lst, pos1, pos2, sim, depth=0, logger=None):
     """ recursively remove the longest of similar matches
     Consider [[1,   300],
               [40,  298],
               [150, 300]]
     where pos1 = 0 and pos2 = 1
     """
+    if depth == 0:
+        logger.info("Filtering list to select the longest of multiple hits")
     # for each possible combination of the list
     #@ (0, 1), (1,2), (0,2)
-    #print(depth)
-    #print("old _lst")
-    #print(lst)
+    logger.debug("Recursion Depth: %d", depth)
+    log_coords(logger=logger, msg="Old Coord List", coords=new_coords)
     for i1, i2 in itertools.combinations(
             list(range(0, len(lst))), 2):
         # if the differences between starts pass our threshold, ie similar start coordinates
         #@ if abs(1 - 40) < 50: (yes)
         start , end = pos1, pos2
-        # check the starts
-        #print("(%d - %d)  < %d" %(lst[i1][pos1], lst[i2][pos1], sim))
+        # check the starts for similar hits
+        logger.debug("(%d - %d)  < %d ?", lst[i1][pos1], lst[i2][pos1], sim)
         if abs(lst[i1][pos1] - lst[i2][pos1]) < sim:
-            #print("yes")
+            logger.debug("Yes, removing one of the hits")
             # pick longest; start with the first, and replace if a longer one is found
             #@ if abs(300-1) > abs(289 - 40) : (yes)
             if abs(lst[i1][pos2] - lst[i1][pos1]) > abs(lst[i2][pos2] - lst[i2][pos1]):
-                #print("Removing:")
-                #print(lst[i2])
                 new_lst = [x for x in lst if x != lst[i2]]  # new list, removing the one we filtered out
             else:
                 new_lst = [x for x in lst if x != lst[i1]]  # new list, removing the one we filtered out
-            #print("new list:")
-            #print(new_lst)
-            return filter_list(new_lst, pos1, pos2, sim) # recurse
+            logger.debug("Removed a hit with a similar start coord")
+            return filter_list(new_lst, pos1, pos2, sim, depth=depth + 1, logger=logger) # recurse
         else:
-            pass
-            #print ("No")
-        # check the ends
-        #print("(%d - %d)  < %d" %(lst[i1][pos2], lst[i2][pos2], sim))
+            logger.debug("No")
+        # check the ends for similar hits
+        logger.debug("(%d - %d)  < %d ?", lst[i1][pos2], lst[i2][pos2], sim)
         if abs(lst[i1][pos2] - lst[i2][pos2]) < sim:
-            #print("yes")
+            logger.debug("Yes, removing one of the hits")
             # pick the longer:
             #@ if abs(300-1) > abs(289 - 40) : (yes)
             if abs(lst[i1][pos2] - lst[i1][pos1]) > abs(lst[i2][pos2] - lst[i2][pos1]):
-                #print("Removing:")
-                #print(lst[i2])
                 new_lst = [x for x in lst if x != lst[i2]]  # new list, removing the one we filtered out
             else:
                 new_lst = [x for x in lst if x != lst[i1]]  # new list, removing the one we filtered out
-            #print("new list:")
-            #print(new_lst)
-            return filter_list(new_lst, pos1, pos2, sim, depth="sencosngsg") # recurse
+            logger.debug("Removed a hit with a similar end coord")
+            return filter_list(new_lst, pos1, pos2, sim, depth=depth + 1, logger=logger) # recurse
         else:
-            pass
-            #print ("No")
+            logger.debug("No")
     if len(lst) > 1:
-        #print("removing overly much")
+        logger.info("Finished filtering close hits; but contig still " +
+                    "has more than one hit. Selecting the longest")
         len_list = [abs(x[pos2] - x[pos1]) for x in lst]
         for i, l in enumerate(len_list):
             if l == max(len_list):
                 return [lst[i]]
     else:
-        # if no issues were found,
-        #print("we done")
         return lst
 
 
-def condensce_coords(coords, sim=50, blend=0):
+def condensce_coords(coords, sim=50, blend=0, logger=None):
     """ simplify coords file to only include contig boundaries
 
     SIS does not break contigs, neither does this
@@ -251,111 +293,156 @@ def condensce_coords(coords, sim=50, blend=0):
     NOTE:  we assume ordering at this stage, where coordinates of the
            reference in the first column [S1] are ascending
     """
-    coords = blend_close_hits(coords=coords, blend=blend)
+    coords = blend_close_hits(coords=coords, blend=blend, logger=logger)
     processed_contigs = []
     filtered_coords = []
     new_coords = []
     all_contigs = [line[4] for line in coords]
     duplicated_contigs = list(set([x for x in all_contigs if all_contigs.count(x) > 1]))
-    #print(duplicated_contigs)
+    logger.debug("duplicated_contigs: %s", " ".join(duplicated_contigs))
     # select best hits when overlapping
     for contig in set(all_contigs):
         contig_coords_list = [x for x in coords if x[4] == contig]
         if contig in duplicated_contigs:
-            #print("filtering %s" %sim)
-            # filter out  similar starts or ends:
-            #print("old")
-            #print(contig_coords_list)
             contig_coords_list = filter_list(contig_coords_list, 2,3, sim)
-            #print("new")
-            #print(contig_coords_list)
         filtered_coords.extend(contig_coords_list)
-    # condesce
-    #print("post filter")
-    #print(filtered_coords)
+    # condensce
+    log_coords(logger=logger, msg="Filtered Coord List", coords=new_coords)
     for idx, line in enumerate(filtered_coords):
         if line[4] not in processed_contigs:
             new_coords.append(line)
             processed_contigs.append(line[4])
-        else: # if contig already found, change end boundary to this one
-            new_coords[len(new_coords) - 1][1] = line[1]
+        else: # if contig already found, warn and ignore
+            logger.warning("Warning: %s found twice in the filtered coordinate list, " +
+                           "likely indicating major rearrangements. Check a visualization " +
+                           "of the contigs against your reference. only outputting first hit", line[4])
     new_coords.sort()
+    log_coords(logger=logger, msg="SORTED coords", coords=new_coords)
+    
     return new_coords
 
 
-def write_scaffold(coords, contigs, thresh, sis_scaff):
+def write_scaffold(coords, contig_file, thresh, sis_scaff, logger):
     """ for each contig in coords, read through the contigs, find the rec, and write it out
     this is probably very wasteful, but oh well
+    returns  number of N's and total length
     """
+    results = {"Scaffold name": [],
+               "N's": [],
+               "Length": []
+    }
+    scaff_number = 1
+    for scaffold, contigs in sis_scaff.items():
+        rec_ids = []
+        new_seq = ""
+        Ns = 0
+        scaffolded_sequences = []
+        for contig_ori_pair in contigs:
+            scaffolded_sequences.append(contig_ori_pair[0])
+        for idx, line in enumerate(coords):
+            # skip entries not found in this scaffold 
+            if line[4] not in scaffolded_sequences:
+                logger.debug("Not writing out %s in scaffold %d" % line[4], scaff_number)
+                continue
+            logger.debug("processing " + " ".join([str(x) for x in line]))
+            FOUND = False
+            with open(contig_file, "r") as inf:
+                for rec in SeqIO.parse(inf, "fasta"):
+                    if idx == 0:  # first time through. populate the recs list
+                        rec_ids.append(rec.id)
+                    if rec.id == line[4].strip():
+                        FOUND = True
+                        if line[2] < line[3]:  # if forward
+                            new_seq = new_seq + rec.seq
+                        else:  # if reverse, get the reverse complememnt
+                            new_seq = new_seq + rec.reverse_complement().seq
+                        #  if not the last entry, calculate the gap length
+                        if idx != len(coords) - 1:
+                            #                 next start - this end
+                            gap_len = coords[idx + 1][0] - line[1]
+                            logger.debug("adding gap of %d" % gap_len)
+                            new_seq = new_seq + ("N" * gap_len)
+                            Ns = Ns + gap_len
+                if not FOUND:
+                    logger.error(                            
+                        str("Contig %s found in coords file but " +
+                            "not in contigs file seq ids: \n%s! Exiting...\n") %\
+                        (line[4], "\n".join(rec_ids)))
+                    sys.exit(1)
+        results['Scaffold name'].append("SIS_Scaffold_%05d" % scaff_number)
+        results["N's"].append(Ns)
+        results['Length'].append(len(new_seq))
+        sys.stdout.write(SeqRecord(new_seq, id="SIS_Scaffold_%05d" % scaff_number).format("fasta"))
+        scaff_number = scaff_number +  1
+    return (results)
+
+def write_unplaced(coords, contig_file, thresh, sis_scaff, logger):
+    """ for each contig, check if it is part of the scaffold.  if not, write it
+    This check to see if the contig is either (a) in the filtered coords file or
+    (b) in the scaffolded sequences file.  this gets rid of sequences 
+    not scaffolded by sis, or filtered out here due to lenght
+    """
+    unscaffolded_count = 0
     scaffolded_sequences = []
+    coord_sequences = [x[4] for x in coords]
     for scaff, lst in sis_scaff.items():
         for pair in lst:
             scaffolded_sequences.append(pair[0])
-
-    new_seq = ""
-    recs = []
-    for idx, line in enumerate(coords):
-        # skip entries not found in sis file
-        if line[4] not in scaffolded_sequences:
-            sys.stderr.write("Not writing out %s, as it was not included by SIS" % line[4])
-            continue
-        sys.stderr.write("processing " + " ".join([str(x) for x in line]) + "\n")
-        FOUND = False
-        with open(contigs, "r") as inf:
-            for rec in SeqIO.parse(inf, "fasta"):
-                if idx == 0:  # first time through. populate the recs list
-                    recs.append(rec.id)
-                if rec.id == line[4].strip():
-                    FOUND = True
-                    if line[2] < line[3]:  # if forward
-                        new_seq = new_seq + rec.seq
-                    else:  # if reverse, get the reverse complememnt
-                        new_seq = new_seq + rec.reverse_complement().seq
-                    #  if not the last entry, calculate the gap length
-                    if idx != len(coords) - 1:
-                        #                 next start - this end
-                        gap_len = coords[idx + 1][0] - line[1]
-                        print("adding gap of %d" % gap_len)
-                        new_seq = new_seq + ("N" * gap_len)
-            if not FOUND:
-                sys.stderr.write(
-                    str("Contig %s found in coords file but " +
-                        "not in contigs file seq ids: \n%s! Exiting...\n") %\
-                    (line[4], "\n".join(recs)))
-                sys.exit(1)
-    sys.stdout.write(SeqRecord(new_seq, id="SIS_scaffolds").format("fasta"))
+    unscaffolded_seqs = []
+    with open(contig_file, "r") as inf:
+        for rec in SeqIO.parse(inf, "fasta"):
+            if rec.id not in scaffolded_sequences or rec.id not in coord_sequences:
+                sys.stdout.write(rec.format("fasta"))
+                unscaffolded_count = unscaffolded_count + 1
+    return unscaffolded_count
 
 
 def main():
     args = get_args()
     exe_dict = check_exes()
-    cmds = make_nucmer_delta_show_cmds(exes=exe_dict, ref=args.reference, query=args.contigs, out_dir=os.getcwd(), prefix="out", header=True)
+    logger = get_minimal_logger(args.verbosity)
+    cmds = make_nucmer_delta_show_cmds(
+        exes=exe_dict, ref=args.reference, query=args.contigs,
+        out_dir=os.getcwd(), prefix="out", header=True)
+    logger.info("Running nucmer, delta-filter, and show-coords")
     for cmd in cmds:
-        sys.stderr.write(cmd + "\n")
+        logger.debug(cmd)
         subprocess.run(cmd,
                        shell=sys.platform != "win32",
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE,
                        check=True)
-    stdout_ = sys.stdout #Keep track of the previous value.
+    # stdout_ = sys.stdout #Keep track of the previous value.
     f = io.StringIO()
+    logger.info("Generating scaffold with  SIS")
     with redirect_stdout(f):
         sis_main(args=["sis.py", os.path.join(os.getcwd(), "out.coords")])
     sis_out = f.getvalue()
+    logger.debug("SIS results: \n%s", sis_out)
+    logger.info("Parsing nucmer coordinates")
     coords = parse_coords(os.path.join(os.getcwd(), "out.coords"),
                           min_length=args.minimum,
                           thresh=args.threshold)
-    print("OLD")
-    for l in coords:
-        pass
-        print(l)
-    new_coords = condensce_coords(coords, sim=50, blend=args.blend)
-    print("NEW")
-    for l in new_coords:
-        pass
-        print(l)
+    log_coords(logger=logger, msg="Initial Coords", coords=coords)
+    new_coords = condensce_coords(coords, sim=args.similarity, blend=args.blend, logger=logger)
+    log_coords(logger=logger, msg="Condensced coords", coords=new_coords)
     scaffolds = parse_sis(sis_file=sis_out)
-    write_scaffold(new_coords, args.contigs, thresh=args.threshold, sis_scaff=scaffolds)
+    print(scaffolds)
+    if args.unplaced:
+        unscaffolded_count = write_unplaced(new_coords, args.contigs, thresh=args.threshold, sis_scaff=scaffolds, logger=logger)
+        logger.info("Finished! Wrote out %d scaffolds", unscaffolded_count) 
+    else:
+        results = write_scaffold(new_coords, args.contigs, thresh=args.threshold, sis_scaff=scaffolds, logger=logger)
+        logger.info("Finished! Wrote out %d scaffolds", len(results))
+        sys.stderr.write("Name\tLength\tN's\n")
+        for i in range(len(results['Scaffold name'])):
+            print(i)
+            sys.stderr.write("\t".join([
+                results['Scaffold name'][i],
+                str(results['Length'][i]),
+                str(results["N's"][i])
+                ]) + "\n")
+                    
 
 
 if __name__ == "__main__":
