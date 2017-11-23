@@ -5,6 +5,43 @@
 - sis.py and multifasta.py return a return code 1 if there is an error in execution
 - as of 0.1.0, multifasta.py writes scaffolds to stdout as well as to the local directory
 
+## Development Features: `scaffold.py`
+`scaffold.py` streamlines SIS usage by orchestrating the nucmer and SIS commands;  the resulting file is a scaffold of the contigs sparated by a length of N's representing the best guess of the gap length.  In short,  nucmer coords are filtered to removeduplicate hits in disparate parts of the reference, similar hits are combined, and the distance between sorted hits is used to estimate the number of missing nucleotides.
+
+### USAGE:
+```
+usage: scaffold.py [-h] [-b BLEND] [-m MINIMUM] [-s SIMILARITY] [-u]
+                   [-t THRESHOLD] [-v {1,2,3,4,5}]
+                   reference contigs
+
+Use nucmer's coords and SIS to generate to scaffoldsome contigs against a
+reference, filling the baps with N's
+
+positional arguments:
+  reference             reference strain
+  contigs               path to your contigs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -b BLEND, --blend BLEND
+                        if two hits from the same contigs are separated by a
+                        gap smaller than this, the hits will be merged;
+                        default: 1000
+  -m MINIMUM, --minimum MINIMUM
+                        minimum length nucmer hit to consider; default: 2000
+  -s SIMILARITY, --similarity SIMILARITY
+                        when a contig has two hits that share similare start
+                        or end coordinates, the shorter hitwill be filtered
+                        out to keep the longer hit; default: 50
+  -u, --unplaced        output unplaced contigs to stdout instead of the
+                        scaffolds
+  -t THRESHOLD, --thresh THRESHOLD
+                        Ignore nucmer hits with less percent identity than
+                        this; 95,
+  -v {1,2,3,4,5}, --verbosity {1,2,3,4,5}
+                        logging verbosity output to stderr
+```
+
 ------------
 |  AUTHORS  |
 ------------
