@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 A setuptools based setup module.
 See:
@@ -19,7 +20,7 @@ if sys.version_info <= (3, 0):
 
 setup(
     name='scaffoldsis',
-    version="0.1.0",
+    version="0.1.2",
 
     description='genome scaffolder for prokaryotes',
     long_description="""
